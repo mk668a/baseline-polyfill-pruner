@@ -1,0 +1,11 @@
+{
+  "name": "fixture-with-imports",
+  "private": true,
+  "dependencies": {
+    "array.prototype.flat": "^1.3.0",
+    "left-pad": "^1.3.0"
+  },
+  "browserslist": [
+    "chrome >= 100"
+  ]
+}

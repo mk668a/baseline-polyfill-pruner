@@ -1,10 +1,18 @@
 {
   "name": "baseline-polyfill-pruner",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "Detect and auto-remove polyfills / dependencies that are no longer needed, using Web Platform Baseline data as the trigger.",
   "type": "module",
   "bin": {
     "baseline-prune": "./dist/cli.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mk668a/baseline-polyfill-pruner.git"
+  },
+  "homepage": "https://github.com/mk668a/baseline-polyfill-pruner#readme",
+  "bugs": {
+    "url": "https://github.com/mk668a/baseline-polyfill-pruner/issues"
   },
   "exports": {
     ".": {
@@ -22,7 +30,8 @@
     "dev": "tsc -p tsconfig.json --watch",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "pretest": "npm run build",
-    "test": "node --test"
+    "test": "node --test",
+    "prepublishOnly": "npm run build"
   },
   "keywords": [
     "baseline",
@@ -39,6 +48,7 @@
     "node": ">=20"
   },
   "dependencies": {
+    "browserslist": "^4.24.0",
     "web-features": "^2.0.0"
   },
   "devDependencies": {
