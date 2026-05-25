@@ -3,15 +3,17 @@
  * baseline-prune — CLI entry point.
  *
  * Usage:
- *   baseline-prune [--diff] [--fix] [--cwd <dir>]
+ *   baseline-prune [--diff] [--fix] [--json] [--cwd <dir>]
  *
- * Status: skeleton. Argument parsing and output framing are wired; the actual
- * candidate detection lives behind `findPruneCandidates`, which is not yet
- * implemented (prints a clear notice instead of crashing).
+ * --diff (default) reports removable polyfills without changing files.
+ * --fix removes them from package.json (format-preserving) and prints the
+ * import sites that still reference them. --json emits a machine-readable,
+ * read-only report (used by the GitHub Action to build a PR body).
  */
-import { findPruneCandidates, NotImplementedError } from "./index.js";
+import { findPruneCandidates, type PruneCandidate } from "./index.js";
+import { applyFix, findImportSites } from "./fix.js";
 
-const VERSION = "0.0.0";
+const VERSION = "0.1.0";
 
 const HELP = `baseline-prune — remove polyfills/deps that Baseline says you no longer need
 
@@ -20,14 +22,15 @@ Usage:
 
 Options:
   --diff        Show removable polyfill dependencies without changing files (default).
-  --fix         Apply removals to package.json and import sites.
+  --fix         Remove them from package.json and list remaining import sites.
+  --json        Print a read-only JSON report (candidates + import sites); never writes.
   --cwd <dir>   Project root containing package.json (default: current directory).
   -v, --version Print version.
   -h, --help    Show this help.
 
 How it works:
   A polyfill becomes a removal candidate once the web feature it shims reaches
-  Baseline "Widely available" (its baseline_low_date + 30 months is in the past).
+  Baseline "Widely available" AND your browserslist targets all support it.
 `;
 
 function getFlagValue(args: string[], flag: string): string | undefined {
@@ -36,10 +39,48 @@ function getFlagValue(args: string[], flag: string): string | undefined {
   return args[index + 1];
 }
 
+async function emitJson(cwd: string, candidates: PruneCandidate[]): Promise<void> {
+  const importSites = await findImportSites(
+    cwd,
+    candidates.map((c) => c.packageName),
+  );
+  const report = { version: VERSION, cwd, candidates, importSites };
+  process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
+}
+
+async function runFix(cwd: string, candidates: PruneCandidate[]): Promise<void> {
+  const names = candidates.map((c) => c.packageName);
+  const result = await applyFix(cwd, names);
+
+  for (const candidate of candidates) {
+    console.log(`removed  ${candidate.packageName}  — ${candidate.reason}`);
+  }
+  console.log(`\n✓ Removed ${result.removed.length} dependenc(ies) from package.json.`);
+
+  const sites = await findImportSites(cwd, names);
+  if (sites.length === 0) {
+    console.log("✓ No remaining import sites found — you should be done.");
+    return;
+  }
+  console.log(`\n⚠  ${sites.length} import site(s) still reference the removed package(s).`);
+  console.log("   Remove these manually, then run your build/tests:");
+  for (const site of sites) {
+    console.log(`   - ${site.file}:${site.line}  (${site.packageName})`);
+  }
+}
+
+function printDiff(candidates: PruneCandidate[]): void {
+  for (const candidate of candidates) {
+    console.log(`would remove  ${candidate.packageName}  — ${candidate.reason}`);
+  }
+  console.log(`\n✓ ${candidates.length} removable polyfill(s) found.`);
+  console.log("   Run with --fix to apply.");
+}
+
 async function main(argv: string[]): Promise<number> {
   const args = argv.slice(2);
 
-  if (args.length === 0 || args.includes("-h") || args.includes("--help")) {
+  if (args.includes("-h") || args.includes("--help")) {
     console.log(HELP);
     return 0;
   }
@@ -48,29 +89,29 @@ async function main(argv: string[]): Promise<number> {
     return 0;
   }
 
-  const apply = args.includes("--fix");
   const cwd = getFlagValue(args, "--cwd") ?? process.cwd();
+  const asJson = args.includes("--json");
+  const apply = args.includes("--fix");
 
-  try {
-    const candidates = await findPruneCandidates({ cwd });
-    if (candidates.length === 0) {
-      console.log("✓ No removable polyfills found — your dependencies look lean.");
-      return 0;
-    }
-    for (const candidate of candidates) {
-      const verb = apply ? "REMOVE     " : "would remove";
-      console.log(`${verb}  ${candidate.packageName}  — ${candidate.reason}`);
-    }
+  const candidates = await findPruneCandidates({ cwd });
+
+  if (asJson) {
+    // --json is read-only by contract; it never mutates, even with --fix.
+    await emitJson(cwd, candidates);
     return 0;
-  } catch (error) {
-    if (error instanceof NotImplementedError) {
-      console.error(
-        "🚧  baseline-prune is an early skeleton: candidate detection is not implemented yet.",
-      );
-      return 0;
-    }
-    throw error;
   }
+
+  if (candidates.length === 0) {
+    console.log("✓ No removable polyfills found — your dependencies look lean.");
+    return 0;
+  }
+
+  if (apply) {
+    await runFix(cwd, candidates);
+  } else {
+    printDiff(candidates);
+  }
+  return 0;
 }
 
 main(process.argv)
@@ -78,6 +119,7 @@ main(process.argv)
     process.exitCode = code;
   })
   .catch((error: unknown) => {
-    console.error(error);
+    const message = error instanceof Error ? error.message : String(error);
+    console.error(`baseline-prune: ${message}`);
     process.exitCode = 1;
   });

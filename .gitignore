@@ -6,3 +6,7 @@ dist/
 coverage/
 .env
 .env.*
+
+# Local-only working docs (not published)
+PLAN.md
+CLAUDE.md

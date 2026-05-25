@@ -1,0 +1,23 @@
+# Copy this into your repo at .github/workflows/baseline-prune.yml
+# It opens a PR whenever a polyfill becomes safe to drop per Web Platform Baseline.
+name: Baseline polyfill prune
+
+on:
+  schedule:
+    - cron: "0 9 * * 1" # Mondays, 09:00 UTC
+  workflow_dispatch: {} # also runnable on demand
+
+permissions:
+  contents: write # push the removal branch
+  pull-requests: write # open the PR
+
+jobs:
+  prune:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: mk668a/baseline-polyfill-pruner@v1
+        with:
+          working-directory: "."
+          # token: ${{ secrets.GITHUB_TOKEN }}   # default; override for cross-repo PRs
+          # labels: "dependencies,baseline"
