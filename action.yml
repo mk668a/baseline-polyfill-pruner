@@ -1,0 +1,75 @@
+name: "baseline-polyfill-pruner"
+description: "Open a PR removing polyfills that Web Platform Baseline reports as widely available."
+author: "mk668a"
+branding:
+  icon: "scissors"
+  color: "green"
+
+inputs:
+  working-directory:
+    description: "Project root containing package.json."
+    default: "."
+  token:
+    description: "Token used to push the branch and open the PR (needs contents:write + pull-requests:write)."
+    default: ${{ github.token }}
+  node-version:
+    description: "Node.js version to run the engine with."
+    default: "20"
+  branch:
+    description: "Head branch the PR is opened from."
+    default: "baseline-prune/updates"
+  base:
+    description: "Base branch for the PR. Empty = the repository default branch."
+    default: ""
+  commit-message:
+    description: "Commit message for the removal."
+    default: "chore(deps): drop polyfills Baseline reports as widely available"
+  labels:
+    description: "Comma-separated labels applied to the PR."
+    default: "dependencies"
+
+outputs:
+  count:
+    description: "Number of removable polyfills detected."
+    value: ${{ steps.body.outputs.count }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ inputs.node-version }}
+
+    - name: Detect removable polyfills (read-only)
+      id: detect
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      run: |
+        npx --yes -p baseline-polyfill-pruner baseline-prune --json --cwd . \
+          > "$RUNNER_TEMP/baseline-prune.json"
+        cat "$RUNNER_TEMP/baseline-prune.json"
+
+    - name: Build PR body
+      id: body
+      shell: bash
+      run: node "${{ github.action_path }}/scripts/pr-body.mjs" "$RUNNER_TEMP/baseline-prune.json"
+
+    - name: Apply removals
+      if: ${{ steps.body.outputs.count != '0' }}
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      run: npx --yes -p baseline-polyfill-pruner baseline-prune --fix --cwd .
+
+    - name: Open pull request
+      if: ${{ steps.body.outputs.count != '0' }}
+      uses: peter-evans/create-pull-request@v6
+      with:
+        token: ${{ inputs.token }}
+        branch: ${{ inputs.branch }}
+        base: ${{ inputs.base }}
+        commit-message: ${{ inputs.commit-message }}
+        title: ${{ steps.body.outputs.title }}
+        body: ${{ steps.body.outputs.body }}
+        labels: ${{ inputs.labels }}
+        delete-branch: true
