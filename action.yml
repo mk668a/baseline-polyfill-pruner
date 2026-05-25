@@ -41,25 +41,30 @@ runs:
       with:
         node-version: ${{ inputs.node-version }}
 
+    - name: Build baseline-prune from this action
+      shell: bash
+      run: |
+        cd "$GITHUB_ACTION_PATH"
+        npm ci
+        npm run build
+
     - name: Detect removable polyfills (read-only)
       id: detect
       shell: bash
-      working-directory: ${{ inputs.working-directory }}
       run: |
-        npx --yes -p baseline-polyfill-pruner baseline-prune --json --cwd . \
+        node "$GITHUB_ACTION_PATH/dist/cli.js" --json --cwd "${{ inputs.working-directory }}" \
           > "$RUNNER_TEMP/baseline-prune.json"
         cat "$RUNNER_TEMP/baseline-prune.json"
 
     - name: Build PR body
       id: body
       shell: bash
-      run: node "${{ github.action_path }}/scripts/pr-body.mjs" "$RUNNER_TEMP/baseline-prune.json"
+      run: node "$GITHUB_ACTION_PATH/scripts/pr-body.mjs" "$RUNNER_TEMP/baseline-prune.json"
 
     - name: Apply removals
       if: ${{ steps.body.outputs.count != '0' }}
       shell: bash
-      working-directory: ${{ inputs.working-directory }}
-      run: npx --yes -p baseline-polyfill-pruner baseline-prune --fix --cwd .
+      run: node "$GITHUB_ACTION_PATH/dist/cli.js" --fix --cwd "${{ inputs.working-directory }}"
 
     - name: Open pull request
       if: ${{ steps.body.outputs.count != '0' }}
