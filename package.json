@@ -1,0 +1,48 @@
+{
+  "name": "baseline-polyfill-pruner",
+  "version": "0.0.0",
+  "description": "Detect and auto-remove polyfills / dependencies that are no longer needed, using Web Platform Baseline data as the trigger.",
+  "type": "module",
+  "bin": {
+    "baseline-prune": "./dist/cli.js"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "dev": "tsc -p tsconfig.json --watch",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "pretest": "npm run build",
+    "test": "node --test"
+  },
+  "keywords": [
+    "baseline",
+    "web-features",
+    "polyfill",
+    "codemod",
+    "dependencies",
+    "cli",
+    "prune"
+  ],
+  "license": "MIT",
+  "author": "mk668a",
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "web-features": "^2.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.6.0"
+  }
+}
