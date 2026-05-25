@@ -35,6 +35,11 @@ baseline-high(feature)  AND  browserslist-targets-all-support(feature)
 
 ## Install
 
+> **Not on npm yet.** Use the [GitHub Action](#github-action-the-point) below
+> (self-contained — no install needed), or build from source (see
+> [Development](#development)). The `npm` / `npx` commands here will start
+> working once `0.1.0` is published to npm.
+
 ```sh
 npm install --save-dev baseline-polyfill-pruner
 # or run ad-hoc:
